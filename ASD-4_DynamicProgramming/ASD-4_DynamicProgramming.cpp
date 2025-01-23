@@ -41,8 +41,12 @@ public:
     void MoveDownRight(Vector2f&, int&);
     void FindPath();
     void LeaveFootprints(RenderWindow&);
+    void Retry();
 };
 
+/**
+ * @brief Конструктор за замовченням класу Game 
+ */
 Game::Game() {
     
     int w = 10;
@@ -78,23 +82,68 @@ Game::Game() {
     this->minPrice = INF;
 }
 
+void Game::Retry() {
+
+    int w = 10;
+    int h = w;
+    cout << "width map : " << w << " height map : " << h << endl;
+    this->map.clear();
+    this->map.resize(w, vector<int>(h, 0));
+    for (int i = 0; i < this->map.size(); i++) {
+        for (int j = 0; j < this->map[i].size(); j++) {
+            this->map[i][j] = rand() % 10 + 1;
+        }
+    }
+    do {
+        this->xP = rand() % this->map.size();
+    } while (this->xP == this->map.size() - 1);
+    do {
+        this->yP = rand() % this->map.size();
+    } while (this->yP == this->map.size() - 1);
+    do {
+        this->xG = rand() % this->map.size();
+    } while (this->xG <= this->xP);
+    do {
+        this->yG = rand() % this->map.size();
+    } while (this->yG <= this->yP);
+    cout << "Player coord : x(" << this->xP << ") y(" << this->yP << ")" << endl;
+    cout << "Goal coord : x(" << this->xG << ") y(" << this->yG << ")" << endl;
+    this->currentFramePlayer = 0;
+    this->currentFramePlayerJump = 0;
+    this->currentFrameGoal = 0;
+    this->animationTimer = 0.0f;
+    this->animationSpeed = 0.1f;
+    this->minPrice = INF;
+    while (!this->move.empty()) {
+        this->move.pop();
+    }
+}
+
+/**
+ * @brief Метод, який відображує матрицю-мапу, де кожна клітинка це вартість її відвідування
+ */
 void Game::ShowMap() {
 
     cout << "The map-matrix: " << endl;
     for (int i = 0; i < this->map.size(); i++) {
         for (int j = 0; j < this->map[i].size(); j++) {
-            cout << setw(2) << this->map[i][j] << " ";
+            if(this->xP == i && this->yP == j) cout << ANSI_COLOR_GREEN << setw(3) << this->map[i][j] << ANSI_COLOR_RESET;
+            else if(this->xG == i && this->yG == j) cout << ANSI_COLOR_PURPLE << setw(3) << this->map[i][j] << ANSI_COLOR_RESET;
+            else cout << setw(3) << this->map[i][j];
         }cout << endl;
     }
 }
 
+/**
+ * @brief Метод, який шукає шлях з точки х1у1 у точку х2у2 за допомогою динамічного програмування
+ */
 void Game::FindPath() {
 
     vector<vector<int>> minPath(this->map.size(), vector<int>(this->map[0].size(), INF));
 
     minPath[this->xP][this->yP] = this->map[this->xP][this->yP];
 
-    cout << "The dp-matrix: " << endl;
+    cout << "The minPath-matrix: " << endl;
     for (int i = 0; i < minPath.size(); i++) {
         for (int j = 0; j < minPath[i].size(); j++) {
             if(minPath[i][j] == INF) cout << setw(4) << "INF";
@@ -110,15 +159,16 @@ void Game::FindPath() {
         }
     }
 
-    cout << "The dp-matrix-2: " << endl;
+    this->minPrice = minPath[this->xG][this->yG];
+
+    cout << "The minPath-matrix-2: " << endl;
     for (int i = 0; i < minPath.size(); i++) {
         for (int j = 0; j < minPath[i].size(); j++) {
             if (minPath[i][j] == INF) cout << setw(4) << "INF";
+            else if(this->minPrice == minPath[i][j]) cout << ANSI_COLOR_PURPLE << setw(4) << minPath[i][j] << ANSI_COLOR_RESET;
             else cout << setw(4) << minPath[i][j];
         }cout << endl;
     }
-
-    this->minPrice = minPath[this->xG][this->yG];
 
     int x = this->xG, y = this->yG;
     while (x != this->xP || y != this->yP) {
@@ -139,6 +189,11 @@ void Game::FindPath() {
     cout << "Min dist cost : " << this->minPrice << endl;
 }
 
+/**
+ * @brief Метод, який рендерить мапу у вікні
+ * @param w Вікно відображення графічних елементів програми
+ * @param fileName Шлях до тайлсету
+ */
 void Game::DrawMap(RenderWindow& w, const string& fileName) {
 
     Texture tileset;
@@ -195,6 +250,13 @@ void Game::DrawMap(RenderWindow& w, const string& fileName) {
     }
 }
 
+/**
+ * @brief Метод, який рендерить ціль гравця у вікні
+ * @param w Вікно відображення графічних елементів програми
+ * @param fileName Шлях до анімації очікування
+ * @param fileName2 Шлях до анімації очікування-2О
+ * @param clock б'єкт відстеження часу, використовується для створення анімації цілі
+ */
 void Game::DrawGoal(RenderWindow& w, const string& fileName, const string& fileName2, Clock clock) {
 
     static Texture goal, goal2;
@@ -229,6 +291,14 @@ void Game::DrawGoal(RenderWindow& w, const string& fileName, const string& fileN
     w.draw(sprite);
 }
 
+/**
+ * @brief Метод, який рендерить ігрового персонажа у вікні
+ * @param w Вікно відображення графічних елементів програми
+ * @param fileName Шлях до анімації очікування
+ * @param fileName2 Шлях до анімації ходьби
+ * @param fileName3 Шлях до анімації стрибка
+ * @param clock б'єкт відстеження часу, використовується для створення анімації ігрового персонажа
+ */
 void Game::DrawPlayer(RenderWindow& w, const string& fileName, const string& fileName2, const string& fileName3, Clock clock) {
 
     Texture playerT, playerW, playerJ;
@@ -285,7 +355,7 @@ void Game::DrawPlayer(RenderWindow& w, const string& fileName, const string& fil
     static Vector2u prevWindowSize = w.getSize();
     static Vector2f current(this->yP * mapTileSize + offsetX - 40, this->xP * mapTileSize + offsetY);
     
-    if (prevWindowSize != w.getSize()) {
+    if (prevWindowSize != w.getSize() || Keyboard::isKeyPressed(Keyboard::Key::R)) {
         current.x = this->yP * mapTileSize + offsetX - 40;
         current.y = this->xP * mapTileSize + offsetY;
         prevWindowSize = w.getSize();
@@ -330,6 +400,11 @@ void Game::DrawPlayer(RenderWindow& w, const string& fileName, const string& fil
     }
 }
 
+/**
+ * @brief Метод, який рухає ігрового персонажа вправо
+ * @param current Поточна позиція на мапі
+ * @param currentPos Поточний крок руху на мапі
+ */
 void Game::MoveRight(Vector2f& current, int& currentPos) {
     
     float playerSpeed = 8.0f;
@@ -337,6 +412,11 @@ void Game::MoveRight(Vector2f& current, int& currentPos) {
     currentPos += playerSpeed;
 }
 
+/**
+ * @brief Метод, який рухає ігрового персонажа вниз
+ * @param current Поточна позиція на мапі
+ * @param currentPos Поточний крок руху на мапі
+ */
 void Game::MoveDown(Vector2f& current, int& currentPos) {
 
     float playerSpeed = 8.0f;
@@ -344,6 +424,11 @@ void Game::MoveDown(Vector2f& current, int& currentPos) {
     currentPos += playerSpeed;
 }
 
+/**
+ * @brief Метод, який рухає ігрового персонажа вправо-вниз
+ * @param current Поточна позиція на мапі
+ * @param currentPos Поточний крок руху на мапі
+ */
 void Game::MoveDownRight(Vector2f& current, int& currentPos) {
 
     float playerSpeed = 8.0f;
@@ -352,6 +437,10 @@ void Game::MoveDownRight(Vector2f& current, int& currentPos) {
     currentPos += playerSpeed;
 }
 
+/**
+ * @brief Метод, який відображує траєкторію руху персонажа
+ * @param w Вікно відображення графічних елементів програми
+ */
 void Game::LeaveFootprints(RenderWindow& w) {
     static vector<CircleShape> footprints;
     CircleShape footprint(5);
@@ -368,6 +457,9 @@ void Game::LeaveFootprints(RenderWindow& w) {
     for (const auto& f : footprints) {
         w.draw(f);
     }
+
+    if (Keyboard::isKeyPressed(Keyboard::Key::R)) footprints.clear();
+
 }
 
 int main() {
@@ -398,6 +490,11 @@ int main() {
                     else {
                         w.create(sf::VideoMode({ 1000, 800 }), "The best game", sf::Style::Close | sf::Style::Resize);
                     }
+                }
+                if (keyPressed->scancode == Keyboard::Scancode::R) {
+                    w.clear(bg);
+                    g.Retry();
+                    w.create(sf::VideoMode({ 1000, 800 }), "The best game", sf::Style::Close | sf::Style::Resize);
                 }
             }
             if (event->getIf<Event::Resized>()) {
